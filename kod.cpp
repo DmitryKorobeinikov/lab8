@@ -1,323 +1,148 @@
-#include <stdio.h>
-#include <string.h>
-#include <locale.h>
-#include <stdlib.h>
+#include <iostream>
+#include <iomanip>
+#include <cstdio>   // Для работы с файлами
+#include <cstring>
+#include <windows.h>
 
-// Структура для хранения информации о видеокассете
-struct Videocassette
-{
-    char title[100];
-    char director[100];
-    int duration;
-    float price;
+using namespace std;
+
+// Структура "Видеокассета"
+struct Videotape {
+    char title[50];       // Название фильма
+    char director[50];    // Режиссер
+    int duration;         // Продолжительность (мин)
+    double price;         // Цена
 };
 
-// Ввод одной видеокассеты
-int inputCassette(Videocassette &v)
-{
-    printf("Название фильма: ");
-    if (fgets(v.title, 100, stdin) == NULL)
-        return 0;
-
-    v.title[strcspn(v.title, "\n")] = '\0';
-
-    printf("Режиссер: ");
-    if (fgets(v.director, 100, stdin) == NULL)
-        return 0;
-
-    v.director[strcspn(v.director, "\n")] = '\0';
-
-    printf("Продолжительность (мин): ");
-    if (scanf("%d", &v.duration) != 1)
-        return 0;
-
-    printf("Цена: ");
-    if (scanf("%f", &v.price) != 1)
-        return 0;
-
-    getchar();
-
-    return 1;
+// Функция для ввода одной структуры
+void inputVideotape(Videotape &v) {
+    cout << "Название фильма: ";
+    cin.ignore(); 
+    cin.getline(v.title, 50);
+    cout << "Режиссер: ";
+    cin.getline(v.director, 50);
+    cout << "Продолжительность (мин): ";
+    cin >> v.duration;
+    cout << "Цена: ";
+    cin >> v.price;
 }
 
-// Формирование файла
-int createFile(int n)
-{
-    FILE *f;
-    Videocassette v;
-
-    f = fopen("videocassettes.dat", "wb");
-
-    if (f == NULL)
-    {
-        printf("Ошибка открытия файла!\n");
-        return 0;
+// 1. Функция формирования файла
+void createFile(const char* filename, int count) {
+    FILE* f = fopen(filename, "wb");
+    if (!f) {
+        cout << "Ошибка: не удалось открыть файл для записи!\n";
+        return;
     }
-
-    for (int i = 0; i < n; i++)
-    {
-        printf("\nВидеокассета №%d\n", i + 1);
-
-        if (!inputCassette(v))
-        {
-            printf("Ошибка ввода данных!\n");
-            fclose(f);
-            return 0;
-        }
-
-        if (fwrite(&v, sizeof(Videocassette), 1, f) != 1)
-        {
-            printf("Ошибка записи в файл!\n");
-            fclose(f);
-            return 0;
-        }
+    Videotape v;
+    for (int i = 0; i < count; i++) {
+        cout << "\n--- Ввод записи №" << i + 1 << " ---" << endl;
+        inputVideotape(v);
+        fwrite(&v, sizeof(Videotape), 1, f);
     }
-
     fclose(f);
-
-    return 1;
+    cout << "Файл успешно сформирован.\n";
 }
 
-// Вывод содержимого файла
-int printFile()
-{
-    FILE *f;
-    Videocassette v;
-    int count = 0;
-
-    f = fopen("videocassettes.dat", "rb");
-
-    if (f == NULL)
-    {
-        printf("Ошибка открытия файла!\n");
-        return 0;
+// 2. Функция печати файла
+void printFile(const char* filename) {
+    FILE* f = fopen(filename, "rb");
+    if (!f) {
+        cout << "Ошибка: не удалось открыть файл для чтения!\n";
+        return;
     }
-
-    printf("\nСодержимое файла:\n");
-
-    while (fread(&v, sizeof(Videocassette), 1, f) == 1)
-    {
-        count++;
-
-        printf("\nЗапись №%d\n", count);
-        printf("Название: %s\n", v.title);
-        printf("Режиссер: %s\n", v.director);
-        printf("Продолжительность: %d мин.\n", v.duration);
-        printf("Цена: %.2f\n", v.price);
+    Videotape v;
+    cout << "\n" << string(75, '-') << endl;
+    cout << left << setw(20) << "Название" << setw(20) << "Режиссер" 
+         << setw(15) << "Длительность" << setw(10) << "Цена" << endl;
+    cout << string(75, '-') << endl;
+    
+    while (fread(&v, sizeof(Videotape), 1, f) == 1) {
+        cout << left << setw(20) << v.title 
+             << setw(20) << v.director 
+             << setw(15) << v.duration 
+             << setw(10) << v.price << endl;
     }
-
-    if (ferror(f))
-    {
-        printf("Ошибка чтения файла!\n");
-        fclose(f);
-        return 0;
-    }
-
-    if (count == 0)
-        printf("Файл пустой.\n");
-
+    cout << string(75, '-') << "\n";
     fclose(f);
-
-    return 1;
 }
 
-// Поиск количества записей с ценой выше заданной
-int findExpensive(float limit)
-{
-    FILE *f;
-    Videocassette v;
-    int count = 0;
-
-    f = fopen("videocassettes.dat", "rb");
-
-    if (f == NULL)
-    {
-        printf("Ошибка открытия файла!\n");
-        return -1;
+// 3. Функция удаления элементов с ценой выше заданной
+void deleteByPrice(const char* filename, double maxPrice) {
+    FILE* f = fopen(filename, "rb");
+    FILE* temp = fopen("temp.dat", "wb");
+    if (!f || !temp) {
+        cout << "Ошибка открытия файлов при удалении!\n";
+        if (f) fclose(f);
+        if (temp) fclose(temp);
+        return;
     }
 
-    while (fread(&v, sizeof(Videocassette), 1, f) == 1)
-    {
-        if (v.price > limit)
-            count++;
-    }
-
-    if (ferror(f))
-    {
-        printf("Ошибка чтения файла!\n");
-        fclose(f);
-        return -1;
-    }
-
-    fclose(f);
-
-    return count;
-}
-
-// Удаление записей с ценой выше заданной
-int deleteExpensive(float limit)
-{
-    FILE *f, *temp;
-    Videocassette v;
-
-    f = fopen("videocassettes.dat", "rb");
-
-    if (f == NULL)
-    {
-        printf("Ошибка открытия исходного файла!\n");
-        return 0;
-    }
-
-    temp = fopen("temp.dat", "wb");
-
-    if (temp == NULL)
-    {
-        printf("Ошибка создания временного файла!\n");
-        fclose(f);
-        return 0;
-    }
-
-    while (fread(&v, sizeof(Videocassette), 1, f) == 1)
-    {
-        if (v.price <= limit)
-        {
-            if (fwrite(&v, sizeof(Videocassette), 1, temp) != 1)
-            {
-                printf("Ошибка записи во временный файл!\n");
-                fclose(f);
-                fclose(temp);
-                return 0;
-            }
+    Videotape v;
+    int deletedCount = 0;
+    // Читаем исходный файл
+    while (fread(&v, sizeof(Videotape), 1, f) == 1) {
+        if (v.price > maxPrice) {
+            deletedCount++; // Пропускаем запись (удаляем)
+        } else {
+            fwrite(&v, sizeof(Videotape), 1, temp); // Сохраняем
         }
     }
-
-    if (ferror(f))
-    {
-        printf("Ошибка чтения исходного файла!\n");
-        fclose(f);
-        fclose(temp);
-        return 0;
-    }
-
     fclose(f);
     fclose(temp);
 
-    if (remove("videocassettes.dat") != 0)
-    {
-        printf("Ошибка удаления исходного файла!\n");
-        return 0;
-    }
-
-    if (rename("temp.dat", "videocassettes.dat") != 0)
-    {
-        printf("Ошибка переименования временного файла!
-\n");
-        return 0;
-    }
-
-    return 1;
+    // Заменяем старый файл новым
+    remove(filename);
+    rename("temp.dat", filename);
+    cout << "Удалено записей: " << deletedCount << "\n";
 }
 
-// Добавление трех записей в конец файла
-int addThree()
-{
-    FILE *f;
-    Videocassette v;
-
-    f = fopen("videocassettes.dat", "ab");
-
-    if (f == NULL)
-    {
-        printf("Ошибка открытия файла!\n");
-        return 0;
+// 4. Функция добавления элементов в конец
+void appendToFile(const char* filename, int count) {
+    FILE* f = fopen(filename, "ab"); // "ab" - Append Binary
+    if (!f) {
+        cout << "Ошибка: не удалось открыть файл для добавления!\n";
+        return;
     }
-
-    for (int i = 0; i < 3; i++)
-    {
-        printf("\nНовая видеокассета №%d\n", i + 1);
-
-        if (!inputCassette(v))
-        {
-            printf("Ошибка ввода данных!\n");
-            fclose(f);
-            return 0;
-        }
-
-        if (fwrite(&v, sizeof(Videocassette), 1, f) != 1)
-        {
-            printf("Ошибка записи!\n");
-            fclose(f);
-            return 0;
-        }
+    Videotape v;
+    for (int i = 0; i < count; i++) {
+        cout << "\n--- Добавление записи №" << i + 1 << " ---" << endl;
+        inputVideotape(v);
+        fwrite(&v, sizeof(Videotape), 1, f);
     }
-
     fclose(f);
-
-    return 1;
+    cout << "Добавление завершено.\n";
 }
 
-// Главная функция
-int main()
-{
-    setlocale(LC_ALL, "");
+int main() {
+    SetConsoleOutputCP(65001); // UTF-8 для вывода
+    SetConsoleCP(65001);       // 
+    const char* filename = "videotapes.dat";
 
-    int n;
-    float limit;
-    int deleted;
+    // 1. Формирование файла (создадим 5 записей)
+    cout << "ФОРМИРОВАНИЕ ИСХОДНОГО ФАЙЛА" << endl;
+    createFile(filename, 5);
 
-    printf("Лабораторная работа №8\n");
-    printf("Вариант 11. Видеокассеты\n");
+    // 2. Печать исходного файла
+    cout << "\nИСХОДНОЕ СОДЕРЖИМОЕ ФАЙЛА:" << endl;
+    printFile(filename);
 
-    printf("\nВведите количество видеокассет (не менее 5): ");
+    // 3. Удаление элементов с ценой выше заданной
+    double maxPrice;
+    cout << "\nВведите максимальную цену (записи с ценой выше будут удалены): ";
+    cin >> maxPrice;
+    
+    deleteByPrice(filename, maxPrice);
+    cout << "\nФАЙЛ ПОСЛЕ УДАЛЕНИЯ:" << endl;
+    printFile(filename);
 
-    if (scanf("%d", &n) != 1 || n < 5)
-    {
-        printf("Неверное количество записей!\n");
-        return 0;
-    }
+    // 4. Добавление 3 элементов в конец
+    cout << "\nДОБАВЛЕНИЕ 3 ЭЛЕМЕНТОВ В КОНЕЦ" << endl;
+    appendToFile(filename, 3);
 
-    getchar();
-
-    // Создание файла
-    if (!createFile(n))
-        return 0;
-
-    // Вывод исходного файла
-    printFile();
-
-    // Ввод предельной цены
-    printf("\nВведите цену для удаления записей: ");
-
-    if (scanf("%f", &limit) != 1)
-    {
-        printf("Неверное значение цены!\n");
-        return 0;
-    }
-
-    // Поиск записей для удаления
-    deleted = findExpensive(limit);
-
-    if (deleted < 0)
-        return 0;
-
-    printf("\nНайдено записей для удаления: %d\n", deleted);
-
-    // Удаление записей
-    if (!deleteExpensive(limit))
-        return 0;
-
-    printf("\nФайл после удаления записей:\n");
-    printFile();
-
-    // Добавление трех записей
-    printf("\nДобавление трех новых видеокассет:\n");
-
-    if (!addThree())
-        return 0;
-
-    // Итоговый вывод
-    printf("\nИтоговое содержимое файла:\n");
-    printFile();
+    // 5. Итоговая печать
+    cout << "\nИТОГОВОЕ СОДЕРЖИМОЕ ФАЙЛА:" << endl;
+    printFile(filename);
 
     return 0;
 }
