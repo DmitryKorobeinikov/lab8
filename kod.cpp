@@ -1,148 +1,133 @@
 #include <iostream>
-#include <iomanip>
-#include <cstdio>   // Для работы с файлами
+#include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <windows.h>
 
 using namespace std;
 
-// Структура "Видеокассета"
-struct Videotape {
-    char title[50];       // Название фильма
-    char director[50];    // Режиссер
-    int duration;         // Продолжительность (мин)
-    double price;         // Цена
+// ---------- Описание типа данных ----------
+struct Video {
+    char name[40];       // название фильма
+    char director[40];   // режиссёр
+    int  duration;       // продолжительность (мин)
+    float price;         // цена
 };
 
-// Функция для ввода одной структуры
-void inputVideotape(Videotape &v) {
-    cout << "Название фильма: ";
-    cin.ignore(); 
-    cin.getline(v.title, 50);
-    cout << "Режиссер: ";
-    cin.getline(v.director, 50);
-    cout << "Продолжительность (мин): ";
-    cin >> v.duration;
-    cout << "Цена: ";
-    cin >> v.price;
+const char* FILENAME = "video.dat";
+const char* TMPNAME  = "tmp.dat";
+
+// ---------- Ввод одной записи ----------
+void input_video(Video &v) {
+    cout << "  Название фильма : "; cin >> v.name;
+    cout << "  Режиссёр        : "; cin >> v.director;
+    cout << "  Продолжительность (мин): "; cin >> v.duration;
+    cout << "  Цена            : "; cin >> v.price;
 }
 
-// 1. Функция формирования файла
-void createFile(const char* filename, int count) {
-    FILE* f = fopen(filename, "wb");
-    if (!f) {
-        cout << "Ошибка: не удалось открыть файл для записи!\n";
-        return;
-    }
-    Videotape v;
-    for (int i = 0; i < count; i++) {
-        cout << "\n--- Ввод записи №" << i + 1 << " ---" << endl;
-        inputVideotape(v);
-        fwrite(&v, sizeof(Videotape), 1, f);
-    }
-    fclose(f);
-    cout << "Файл успешно сформирован.\n";
+// ---------- Печать одной записи ----------
+void print_video(const Video &v) {
+    cout << "  " << v.name << " | " << v.director
+         << " | " << v.duration << " мин | " << v.price << " руб.\n";
 }
 
-// 2. Функция печати файла
-void printFile(const char* filename) {
-    FILE* f = fopen(filename, "rb");
-    if (!f) {
-        cout << "Ошибка: не удалось открыть файл для чтения!\n";
-        return;
-    }
-    Videotape v;
-    cout << "\n" << string(75, '-') << endl;
-    cout << left << setw(20) << "Название" << setw(20) << "Режиссер" 
-         << setw(15) << "Длительность" << setw(10) << "Цена" << endl;
-    cout << string(75, '-') << endl;
-    
-    while (fread(&v, sizeof(Videotape), 1, f) == 1) {
-        cout << left << setw(20) << v.title 
-             << setw(20) << v.director 
-             << setw(15) << v.duration 
-             << setw(10) << v.price << endl;
-    }
-    cout << string(75, '-') << "\n";
-    fclose(f);
-}
+// ---------- Формирование файла ----------
+void create_file(const char* fname, int n) {
+    FILE* fp = fopen(fname, "wb");
+    if (!fp) { perror("Ошибка открытия файла для записи"); exit(1); }
 
-// 3. Функция удаления элементов с ценой выше заданной
-void deleteByPrice(const char* filename, double maxPrice) {
-    FILE* f = fopen(filename, "rb");
-    FILE* temp = fopen("temp.dat", "wb");
-    if (!f || !temp) {
-        cout << "Ошибка открытия файлов при удалении!\n";
-        if (f) fclose(f);
-        if (temp) fclose(temp);
-        return;
-    }
-
-    Videotape v;
-    int deletedCount = 0;
-    // Читаем исходный файл
-    while (fread(&v, sizeof(Videotape), 1, f) == 1) {
-        if (v.price > maxPrice) {
-            deletedCount++; // Пропускаем запись (удаляем)
-        } else {
-            fwrite(&v, sizeof(Videotape), 1, temp); // Сохраняем
+    for (int i = 0; i < n; ++i) {
+        cout << "Запись #" << (i + 1) << ":\n";
+        Video v;
+        input_video(v);
+        if (fwrite(&v, sizeof(Video), 1, fp) != 1) {
+            perror("Ошибка записи"); exit(2);
         }
     }
-    fclose(f);
-    fclose(temp);
-
-    // Заменяем старый файл новым
-    remove(filename);
-    rename("temp.dat", filename);
-    cout << "Удалено записей: " << deletedCount << "\n";
+    fclose(fp);
 }
 
-// 4. Функция добавления элементов в конец
-void appendToFile(const char* filename, int count) {
-    FILE* f = fopen(filename, "ab"); // "ab" - Append Binary
-    if (!f) {
-        cout << "Ошибка: не удалось открыть файл для добавления!\n";
-        return;
+// ---------- Печать содержимого файла ----------
+void print_file(const char* fname) {
+    FILE* fp = fopen(fname, "rb");
+    if (!fp) { perror("Ошибка открытия файла для чтения"); exit(3); }
+
+    Video v;
+    cout << "--------------------------------------------------------\n";
+    cout << " Название          | Режиссёр        | Мин | Цена\n";
+    cout << "--------------------------------------------------------\n";
+    while (fread(&v, sizeof(Video), 1, fp) == 1) {
+        print_video(v);
     }
-    Videotape v;
-    for (int i = 0; i < count; i++) {
-        cout << "\n--- Добавление записи №" << i + 1 << " ---" << endl;
-        inputVideotape(v);
-        fwrite(&v, sizeof(Videotape), 1, f);
-    }
-    fclose(f);
-    cout << "Добавление завершено.\n";
+    cout << "--------------------------------------------------------\n";
+    fclose(fp);
 }
 
+// ---------- Удаление записей с price > P_max ----------
+void delete_expensive(const char* src, const char* tmp, float p_max) {
+    FILE* fin  = fopen(src, "rb");
+    if (!fin) { perror("Ошибка открытия исходного файла"); exit(4); }
+
+    FILE* fout = fopen(tmp, "wb");
+    if (!fout) { perror("Ошибка открытия временного файла"); fclose(fin); exit(5); }
+
+    Video v;
+    int kept = 0, removed = 0;
+    while (fread(&v, sizeof(Video), 1, fin) == 1) {
+        if (v.price <= p_max) {
+            fwrite(&v, sizeof(Video), 1, fout);
+            ++kept;
+        } else {
+            ++removed;
+        }
+    }
+    fclose(fin);
+    fclose(fout);
+
+    if (remove(src) != 0) { perror("Ошибка удаления исходного файла"); exit(6); }
+    if (rename(tmp, src) != 0) { perror("Ошибка переименования"); exit(7); }
+
+    cout << "Удалено записей: " << removed
+         << ", оставлено: " << kept << "\n";
+}
+
+// ---------- Добавление k записей в конец ----------
+void add_records(const char* fname, int k) {
+    FILE* fp = fopen(fname, "ab");
+    if (!fp) { perror("Ошибка открытия файла для добавления"); exit(8); }
+
+    for (int i = 0; i < k; ++i) {
+        cout << "Новая запись #" << (i + 1) << ":\n";
+        Video v;
+        input_video(v);
+        fwrite(&v, sizeof(Video), 1, fp);
+    }
+    fclose(fp);
+}
+
+// ---------- Главная функция ----------
 int main() {
-    SetConsoleOutputCP(65001); // UTF-8 для вывода
-    SetConsoleCP(65001);       // 
-    const char* filename = "videotapes.dat";
+    SetConsoleOutputCP(65001);
 
-    // 1. Формирование файла (создадим 5 записей)
-    cout << "ФОРМИРОВАНИЕ ИСХОДНОГО ФАЙЛА" << endl;
-    createFile(filename, 5);
+    int n;
+    cout << "Сколько записей внести в файл? "; cin >> n;
+    create_file(FILENAME, n);
 
-    // 2. Печать исходного файла
-    cout << "\nИСХОДНОЕ СОДЕРЖИМОЕ ФАЙЛА:" << endl;
-    printFile(filename);
+    cout << "\n=== Исходный файл ===\n";
+    print_file(FILENAME);
 
-    // 3. Удаление элементов с ценой выше заданной
-    double maxPrice;
-    cout << "\nВведите максимальную цену (записи с ценой выше будут удалены): ";
-    cin >> maxPrice;
-    
-    deleteByPrice(filename, maxPrice);
-    cout << "\nФАЙЛ ПОСЛЕ УДАЛЕНИЯ:" << endl;
-    printFile(filename);
+    float p_max;
+    cout << "\nУдалить записи с ценой выше: "; cin >> p_max;
+    delete_expensive(FILENAME, TMPNAME, p_max);
 
-    // 4. Добавление 3 элементов в конец
-    cout << "\nДОБАВЛЕНИЕ 3 ЭЛЕМЕНТОВ В КОНЕЦ" << endl;
-    appendToFile(filename, 3);
+    cout << "\n=== Файл после удаления ===\n";
+    print_file(FILENAME);
 
-    // 5. Итоговая печать
-    cout << "\nИТОГОВОЕ СОДЕРЖИМОЕ ФАЙЛА:" << endl;
-    printFile(filename);
+    cout << "\nДобавляем 3 записи в конец файла:\n";
+    add_records(FILENAME, 3);
+
+    cout << "\n=== Файл после добавления ===\n";
+    print_file(FILENAME);
 
     return 0;
 }
